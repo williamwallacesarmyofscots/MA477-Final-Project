@@ -1,0 +1,349 @@
+---
+title: "MA 477 Final Project"
+output: html_document
+date: "2023-11-28"
+---
+
+# Installs
+
+```{r}
+#install.packages("mvtnorm")
+```
+
+# Functions - Porfolio Loss Random Variable
+
+```{r}
+# Functions
+
+L_SIM <- function(a,n,pd){
+    
+    default <- c()
+    U <- runif(n)
+    U2 <- runif(1)
+    Z <- qnorm(U2)
+    Y <- qnorm(U)
+    
+    X <- a*Z + sqrt(1-a^2)*Y
+    threshold <- qnorm(pd)
+
+    for (result in X){
+        
+        if (result <= threshold){
+            default <- append(default, 1)
+            
+        } 
+      
+        else{
+          default <- append(default, 0)
+        }
+        
+    }
+    
+    
+    return (default)
+    
+}
+
+LOSS_SUM <- function(default, r, FV){
+  
+  loss <- 0
+  
+  for (value in default){
+    LGD <- (1-r)*FV
+    loss <- loss + value*LGD
+    
+  }
+  
+  return (loss)
+  
+}
+
+monte_carlo_simulation <- function(a, n, pd, monte_carlo, r, FV){
+    
+    mc_loss <- c()
+    
+    for (i in 1: monte_carlo){
+      
+      default <- L_SIM(a,n,pd)
+    
+      loss <- LOSS_SUM(default, r, FV)
+    
+      mc_loss <- append(mc_loss, loss)
+    
+    }
+    
+    return (mc_loss)
+    
+}
+
+```
+
+# Testing
+
+```{r}
+
+a <- 0.1
+n <- 1000
+pd <- 0.3
+monte_carlo <- 10000
+r <- 0.40
+FV <- 1
+d <- L_SIM(a,n,pd)
+#d
+
+#LOSS_SUM(d, r, FV)
+
+x <- monte_carlo_simulation(a,n,pd,monte_carlo, r, FV)
+
+mean(x)
+
+hist(x)
+
+```
+
+# Plotting Portfolio Loss Mean and SD Across Various Values of a
+
+```{r}
+
+# Set up a range of values for parameter 'a'
+a_values <- seq(0, 1, by = 0.01)
+
+# Initialize an empty vector to store mean and sd of losses
+sd_losses <- numeric(length(a_values))
+mean_losses <- numeric(length(a_values))
+
+# Perform simulations for each value of 'a'
+for (i in seq_along(a_values)) {
+  a <- a_values[i]
+  standard_losses <- sd(monte_carlo_simulation(a, 2, 0.3, 10000, 0, 105))
+  average_losses <- mean((monte_carlo_simulation(a, 2, 0.3, 10000, 0, 105)))
+  sd_losses[i] <- standard_losses
+  mean_losses[i] <- average_losses 
+}
+
+# Plot the results
+plot(a_values, sd_losses, type = "l", col = "blue", lwd = 2,
+     xlab = "Parameter 'a'", ylab = "SD of Loss",
+     main = "Effect of 'a' on SD of Portfolio Loss")
+
+plot(a_values, mean_losses, type = "l", col = "blue", lwd = 2,
+     xlab = "Parameter 'a'", ylab = "Mean of Loss",
+     main = "Effect of 'a' on Mean of Portfolio Loss")
+
+```
+
+# Senior, Junior and Mezzanine Losses Functions
+
+```{r}
+
+S_L <- function(monte_carlo_loss, k1, k2){
+  
+  SL <- c()
+  
+  for (value in monte_carlo_loss){
+    
+    result <- max(0,value-k2)
+    SL <- append(SL, result)
+  
+  }
+  
+  return (SL)
+
+}
+
+M_L <- function(monte_carlo_loss, k1, k2){
+  
+  ML <- c()
+  
+  JL <- J_L(monte_carlo_loss, k1, k2)
+  
+  for (i in 1:length(monte_carlo_loss)){
+    
+    if (JL[i] == k1){
+      
+      result <- min(k2-k1, monte_carlo_loss[i] - k1)
+      
+      ML <- append(ML, result)
+      
+    }
+    
+    else{
+      
+      result <- 0
+      
+      ML <- append(ML, result)
+      
+    }
+  
+  }
+  
+  return (ML)
+
+}
+
+J_L <- function(monte_carlo_loss, k1, k2){
+  
+  JL <- c()
+  
+  for (value in monte_carlo_loss){
+    
+    result <- min(value, k1)
+    JL <- append(JL, result)
+  
+  }
+  
+  return (JL)
+
+}
+
+
+```
+
+# Testing
+
+```{r}
+a <- 0.1
+n <- 2
+pd <- 0.3
+monte_carlo <- 10
+r <- 0
+FV <- 105
+d <- L_SIM(a,n,pd)
+#d
+
+#LOSS_SUM(d, r, FV)
+
+x <- monte_carlo_simulation(a,n,pd,monte_carlo, r, FV)
+
+mean(x)
+
+SL <- S_L(x,20,85)
+ML <- M_L(x,20,85)
+JL <- J_L(x,20,85)
+
+x
+JL
+ML
+SL
+#mean(ML)
+#mean(JL)
+
+hist(x)
+```
+
+# Plotting Portfolio, Senior, Mezzanine, and Junior Loss SD Across Various Values of a
+
+```{r}
+
+# Mess Around with Values as Needed - Create into functions later
+
+# Set up a range of values for parameter 'a'
+a_values <- seq(0, 1, by = 0.1)
+
+# Initialize an empty vector to store mean and sd of losses
+sd_losses1 <- numeric(length(a_values))
+sd_losses2 <- numeric(length(a_values))
+sd_losses3 <- numeric(length(a_values))
+sd_losses4 <- numeric(length(a_values))
+
+mean_losses1 <- numeric(length(a_values))
+mean_losses2 <- numeric(length(a_values))
+mean_losses3 <- numeric(length(a_values))
+mean_losses4 <- numeric(length(a_values))
+
+# Perform simulations for each value of 'a'
+for (i in seq_along(a_values)) {
+  
+  a <- a_values[i]
+
+  L <-  monte_carlo_simulation(a, 1000, 0.3, 10000, 0.5, 105)
+  JL <- J_L(L, 26250, 44625)
+  ML <- M_L(L, 26250, 44625)
+  SL <- S_L(L, 26250, 44625)
+  
+  standard_losses1 <- sd(L)
+  standard_losses2 <- sd(SL)
+  standard_losses3 <- sd(ML)
+  standard_losses4 <- sd(JL)
+  
+  average_losses1 <- mean(L)
+  average_losses2 <- mean(SL)
+  average_losses3 <- mean(ML)
+  average_losses4 <- mean(JL)
+  
+  sd_losses1[i] <- standard_losses1
+  sd_losses2[i] <- standard_losses2
+  sd_losses3[i] <- standard_losses3
+  sd_losses4[i] <- standard_losses4
+  
+  mean_losses1[i] <- average_losses1
+  mean_losses2[i] <- average_losses2
+  mean_losses3[i] <- average_losses3
+  mean_losses4[i] <- average_losses4
+  
+}
+
+# Plot the results
+plot(a_values, sd_losses1, type = "l", col = "blue", lwd = 2,
+     xlab = "Parameter 'a'", ylab = "SD of Loss",
+     main = "Effect of 'a' on SD of Loss")
+
+plot(a_values, mean_losses1, type = "l", col = "blue", lwd = 2,
+     xlab = "Parameter 'a'", ylab = "Mean of Loss",
+     main = "Effect of 'a' on Mean of Loss")
+
+# Plot the results
+plot(a_values, sd_losses2, type = "l", col = "blue", lwd = 2,
+     xlab = "Parameter 'a'", ylab = "SD of Senior Loss",
+     main = "Effect of 'a' on SD of Loss")
+
+plot(a_values, mean_losses2, type = "l", col = "blue", lwd = 2,
+     xlab = "Parameter 'a'", ylab = "Mean of Senior Loss",
+     main = "Effect of 'a' on Mean of Senior Loss")
+
+# Plot the results
+plot(a_values, sd_losses3, type = "l", col = "blue", lwd = 2,
+     xlab = "Parameter 'a'", ylab = "SD of Mezzanine Loss",
+     main = "Effect of 'a' on SD of Loss")
+
+plot(a_values, mean_losses3, type = "l", col = "blue", lwd = 2,
+     xlab = "Parameter 'a'", ylab = "Mean of Mezzanine Loss",
+     main = "Effect of 'a' on Mean of Mezzanine Loss")
+
+# Plot the results
+plot(a_values, sd_losses4, type = "l", col = "blue", lwd = 2,
+     xlab = "Parameter 'a'", ylab = "SD of Junior Loss",
+     main = "Effect of 'a' on SD of Loss")
+
+plot(a_values, mean_losses4, type = "l", col = "blue", lwd = 2,
+     xlab = "Parameter 'a'", ylab = "Mean of Junior Loss",
+     main = "Effect of 'a' on Mean of Junior Loss")
+
+```
+
+# Plots All Together
+
+```{r}
+
+# Combine SD losses and Mean losses into matrices
+sd_matrix <- cbind(sd_losses2, sd_losses3, sd_losses4)
+mean_matrix <- cbind(mean_losses2, mean_losses3, mean_losses4)
+
+# Plot SD losses
+matplot(a_values, sd_matrix, type = "l", lty = 1, col = c("blue","green", "red"),
+        xlab = "Parameter 'a'", ylab = "SD of Losses", main = "Effect of 'a' on the SD of Losses")
+
+# Add legend
+legend("topleft", legend = c("Senior Tranche", "Mezzanine Tranche", "Junior Tranche"), col = c("blue","green", "red"), lty = 1)
+
+# Plot Mean losses
+matplot(a_values, mean_matrix, type = "l", lty = 1, col = c("blue","green", "red"),
+        xlab = "Parameter 'a'", ylab = "Average Losses", main = "Effect of 'a' on the Mean of Loss")
+
+# Add legend
+legend("left", legend = c("Senior Tranche", "Mezzanine Tranche", "Junior Tranche"), col = c("blue","green","red"), lty = 1)
+
+```
+
+
+
